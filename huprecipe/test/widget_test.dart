@@ -1,11 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:huprecipe/app.dart';
 
 void main() {
-  testWidgets('RecipeHub app starts correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const RecipeHubApp());
+  testWidgets(
+    'RecipeHub displays the home screen',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const RecipeHubApp());
 
-    expect(find.text('Bonjour 👋'), findsOneWidget);
-  });
-}
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bonjour 👋'), findsOneWidget);
+      expect(
+        find.text('Découvrez de délicieuses recettes'),
+        findsOneWidget,
+      );
+      expect(find.text('Recettes'), findsOneWidget);
+    },
+  );
+}                                                                                                                                                                                 
