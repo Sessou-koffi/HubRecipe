@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../data/recipe_data.dart';
 import '../models/recipe.dart';
 import '../widgets/category_filter.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/recipe_search_bar.dart';
+import '../widgets/recipe_store_scope.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,14 +17,22 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'Toutes';
 
-  List<String> get _categories {
-    final categories = recipes.map((recipe) => recipe.category).toSet().toList();
+  List<String> _categories(List<Recipe> recipes) {
+    final categories = recipes
+        .map((recipe) => recipe.category)
+        .toSet()
+        .toList();
 
     return ['Toutes', ...categories];
   }
 
-  List<Recipe> get _filteredRecipes {
-    return recipes.where((recipe) {
+  @override
+  Widget build(BuildContext context) {
+    final store = RecipeStoreScope.of(context);
+    final allRecipes = store.recipes;
+    final categories = _categories(allRecipes);
+
+    final filteredRecipes = allRecipes.where((recipe) {
       final matchesSearch = recipe.name.toLowerCase().contains(
             _searchQuery.toLowerCase(),
           );
@@ -34,10 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       return matchesSearch && matchesCategory;
     }).toList();
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
@@ -49,9 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Bonjour 👋',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style:
+                        Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -69,13 +75,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   Text(
                     'Catégories',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style:
+                        Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 12),
                   CategoryFilter(
-                    categories: _categories,
+                    categories: categories,
                     selectedCategory: _selectedCategory,
                     onCategorySelected: (category) {
                       setState(() {
@@ -84,46 +91,106 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Recettes',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  Row(
+                    children: [
+                      Text(
+                        'Recettes',
+                        style:
+                            Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${filteredRecipes.length}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                 ],
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            sliver: SliverLayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.crossAxisExtent;
-                final crossAxisCount = width >= 900 ? 3 : width >= 600 ? 2 : 1;
+          if (filteredRecipes.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptySearchResult(),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.crossAxisExtent;
 
-                return SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final recipe = _filteredRecipes[index];
+                  final crossAxisCount = width >= 900
+                      ? 3
+                      : width >= 600
+                          ? 2
+                          : 1;
 
-                      return RecipeCard(
-                        recipe: recipe,
-                      );
-                    },
-                    childCount: _filteredRecipes.length,
-                  ),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: width < 600 ? 1.55 : 0.9,
-                  ),
-                );
-              },
+                  return SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final recipe = filteredRecipes[index];
+
+                        return RecipeCard(
+                          recipe: recipe,
+                          onFavoritePressed: () {
+                            store.toggleFavorite(recipe.id);
+                          },
+                        );
+                      },
+                      childCount: filteredRecipes.length,
+                    ),
+                    gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: width < 600 ? 1.55 : 0.9,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmptySearchResult extends StatelessWidget {
+  const _EmptySearchResult();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Aucune recette trouvée',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Essayez une autre recherche ou une autre catégorie.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

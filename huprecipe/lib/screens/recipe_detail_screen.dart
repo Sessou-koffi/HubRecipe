@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../data/recipe_data.dart';
 import '../models/recipe.dart';
+import '../widgets/recipe_store_scope.dart';
 
 class RecipeDetailScreen extends StatelessWidget {
   final String recipeId;
@@ -12,41 +12,31 @@ class RecipeDetailScreen extends StatelessWidget {
     required this.recipeId,
   });
 
-  Recipe? get recipe {
-    try {
-      return recipes.firstWhere(
-        (item) => item.id == recipeId,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final currentRecipe = recipe;
+    final store = RecipeStoreScope.of(context);
+    final recipe = store.findById(recipeId);
 
-    if (currentRecipe == null) {
+    if (recipe == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Recette introuvable'),
+          title: const Text('Recette'),
         ),
         body: Center(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(
                 Icons.error_outline,
                 size: 64,
               ),
               const SizedBox(height: 16),
-              Text(
-                'Cette recette n’existe pas.',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              const Text('Recette introuvable'),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => context.go('/'),
+                onPressed: () {
+                  context.go('/');
+                },
                 child: const Text('Retour à l’accueil'),
               ),
             ],
@@ -57,14 +47,17 @@ class RecipeDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentRecipe.name),
+        title: Text(recipe.name),
         actions: [
           IconButton(
             onPressed: () {
-              // Les favoris seront connectés plus tard.
+              store.toggleFavorite(recipe.id);
             },
+            tooltip: recipe.isFavorite
+                ? 'Retirer des favoris'
+                : 'Ajouter aux favoris',
             icon: Icon(
-              currentRecipe.isFavorite
+              recipe.isFavorite
                   ? Icons.favorite
                   : Icons.favorite_border,
             ),
@@ -76,14 +69,10 @@ class RecipeDetailScreen extends StatelessWidget {
           final isTablet = constraints.maxWidth >= 600;
 
           if (isTablet) {
-            return _TabletDetailLayout(
-              recipe: currentRecipe,
-            );
+            return _TabletDetailLayout(recipe: recipe);
           }
 
-          return _MobileDetailLayout(
-            recipe: currentRecipe,
-          );
+          return _MobileDetailLayout(recipe: recipe);
         },
       ),
     );
@@ -103,15 +92,10 @@ class _MobileDetailLayout extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _RecipeImage(
-            recipe: recipe,
-            height: 280,
-          ),
+          _RecipeImage(recipe: recipe),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: _RecipeInformation(
-              recipe: recipe,
-            ),
+            child: _RecipeInformation(recipe: recipe),
           ),
         ],
       ),
@@ -135,17 +119,15 @@ class _TabletDetailLayout extends StatelessWidget {
         children: [
           Expanded(
             flex: 5,
-            child: _RecipeImage(
-              recipe: recipe,
-              height: 500,
+            child: AspectRatio(
+              aspectRatio: 0.9,
+              child: _RecipeImage(recipe: recipe),
             ),
           ),
           const SizedBox(width: 32),
           Expanded(
             flex: 5,
-            child: _RecipeInformation(
-              recipe: recipe,
-            ),
+            child: _RecipeInformation(recipe: recipe),
           ),
         ],
       ),
@@ -155,26 +137,29 @@ class _TabletDetailLayout extends StatelessWidget {
 
 class _RecipeImage extends StatelessWidget {
   final Recipe recipe;
-  final double height;
 
   const _RecipeImage({
     required this.recipe,
-    required this.height,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: height,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
       child: Image.network(
         recipe.imageUrl,
+        width: double.infinity,
+        height: 320,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return const Center(
-            child: Icon(
-              Icons.restaurant,
-              size: 64,
+          return Container(
+            height: 320,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Center(
+              child: Icon(
+                Icons.restaurant,
+                size: 72,
+              ),
             ),
           );
         },
@@ -195,20 +180,13 @@ class _RecipeInformation extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          recipe.name,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             Chip(
               avatar: const Icon(
-                Icons.category_outlined,
+                Icons.category,
                 size: 18,
               ),
               label: Text(recipe.category),
@@ -224,10 +202,17 @@ class _RecipeInformation extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
+          recipe.name,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Text(
           recipe.description,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         Text(
           'Ingrédients',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -237,16 +222,15 @@ class _RecipeInformation extends StatelessWidget {
         const SizedBox(height: 12),
         ...recipe.ingredients.map(
           (ingredient) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.check_circle_outline,
                   size: 20,
-                  color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(ingredient),
                 ),
@@ -254,7 +238,7 @@ class _RecipeInformation extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         Text(
           'Préparation',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(

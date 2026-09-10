@@ -5,10 +5,12 @@ import '../models/recipe.dart';
 
 class RecipeCard extends StatelessWidget {
   final Recipe recipe;
+  final VoidCallback? onFavoritePressed;
 
   const RecipeCard({
     super.key,
     required this.recipe,
+    this.onFavoritePressed,
   });
 
   @override
@@ -39,25 +41,33 @@ class RecipeCard extends StatelessWidget {
                       },
                     ),
                   ),
+
                   Positioned(
                     top: 12,
                     right: 12,
-                    child: CircleAvatar(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.surface,
-                      child: Icon(
-                        recipe.isFavorite
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: recipe.isFavorite
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
+                    child: Material(
+                      color: Theme.of(context).colorScheme.surface,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: onFavoritePressed,
+                        tooltip: recipe.isFavorite
+                            ? 'Retirer des favoris'
+                            : 'Ajouter aux favoris',
+                        icon: Icon(
+                          recipe.isFavorite
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: recipe.isFavorite
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -71,7 +81,9 @@ class RecipeCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                   ),
+
                   const SizedBox(height: 6),
+
                   Row(
                     children: [
                       Icon(
